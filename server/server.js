@@ -13,7 +13,13 @@ await connectDB();
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(cors({
+  origin: [
+    "https://employee-productivity-analysis-fina.vercel.app",
+    "https://employee-productivity-analysis-final-17eeyllxq.vercel.app"
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use(morgan("dev"));
 
