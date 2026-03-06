@@ -8,8 +8,7 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
-dotenv.config({ path: "./.env" });
-console.log("MONGO_URI:", process.env.MONGO_URI);  
+dotenv.config(); 
 await connectDB();
 
 const app = express();
