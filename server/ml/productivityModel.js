@@ -32,7 +32,7 @@ function mapEmployeeToPythonSchema(emp) {
 export async function predictProductivityRemote(emp) {
   const pyEmployee = mapEmployeeToPythonSchema(emp);
 
-  const response = await axios.post("http://localhost:8000/predict", {
+  const response = await axios.post(`${process.env.ML_API_URL}/predict`, {
     employee: pyEmployee
   });
 
@@ -45,7 +45,7 @@ export async function predictProductivityRemote(emp) {
 export async function predictProductivityBatchRemote(employees) {
   const pyEmployees = employees.map(mapEmployeeToPythonSchema);
 
-  const response = await axios.post("http://localhost:8000/predict-batch", {
+  const response = await axios.post(`${process.env.ML_API_URL}/predict-batch`, {
     employees: pyEmployees
   });
 
