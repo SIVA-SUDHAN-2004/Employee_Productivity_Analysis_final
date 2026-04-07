@@ -8,6 +8,7 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  deleteAllEmployees,
   predictForEmployee,
   predictForMany
 } from "../controllers/employeeController.js";
@@ -24,6 +25,8 @@ router.post("/upload-csv", upload.single("file"), uploadCSV);
 router.get("/", getEmployees);
 router.post("/", createEmployee);
 router.put("/:id", updateEmployee);
+// DELETE /api/employees  must come BEFORE /:id so Express doesn't match 'all' as an id
+router.delete("/", deleteAllEmployees);
 router.delete("/:id", deleteEmployee);
 
 // ML prediction

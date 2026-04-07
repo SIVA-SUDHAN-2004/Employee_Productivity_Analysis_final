@@ -1,7 +1,7 @@
 // client/src/pages/DashboardPage.jsx
 import React, { useEffect, useState } from "react";
 import { getSummaryApi } from "../api/analyticsApi.js";
-import { getEmployeesApi } from "../api/employeeApi.js";
+import { useEmployee } from "../context/EmployeeContext.jsx";
 import StatTile from "../components/Common/StatTile.jsx";
 import Card from "../components/Common/Card.jsx";
 import ProductivityBarChart from "../components/Charts/ProductivityBarChart.jsx";
@@ -9,32 +9,31 @@ import HoursVsProductivityScatter from "../components/Charts/HoursVsProductivity
 
 const DashboardPage = () => {
   const [summary, setSummary] = useState(null);
-  const [employees, setEmployees] = useState([]);
+  // Use context so data persists across navigation and stays in sync
+  const { employees } = useEmployee();
 
   useEffect(() => {
     (async () => {
-      const [sRes, eRes] = await Promise.all([
-        getSummaryApi(),
-        getEmployeesApi(1, 50) // page 1, limit 50
-      ]);
-
-      setSummary(sRes.data);
-
-      // eRes.data is the paging object { data, total, page, totalPages }
-      const list = Array.isArray(eRes.data)
-        ? eRes.data
-        : eRes.data?.data || [];
-
-      setEmployees(list);
+      try {
+        const sRes = await getSummaryApi();
+        setSummary(sRes.data);
+      } catch (err) {
+        console.error("Dashboard summary load error:", err);
+      }
     })();
   }, []);
 
-  const barData = employees.map((e) => ({
+  // Only include employees that have been predicted for charts
+  const predictedEmployees = employees.filter(
+    (e) => e.productivityScore !== null && e.productivityScore !== undefined && e.productivityScore !== 0
+  );
+
+  const barData = predictedEmployees.map((e) => ({
     name: e.name || e.employeeId,
     productivityScore: e.productivityScore ?? 0
   }));
 
-  const scatterData = employees.map((e) => ({
+  const scatterData = predictedEmployees.map((e) => ({
     avgHoursPerDay: e.avgHoursPerDay ?? 0,
     productivityScore: e.productivityScore ?? 0
   }));
@@ -49,16 +48,28 @@ const DashboardPage = () => {
         />
         <StatTile label="Max Productivity" value={summary?.maxProductivity ?? "—"} />
         <StatTile label="Min Productivity" value={summary?.minProductivity ?? "—"} />
-        <StatTile label="Employees Tracked" value={summary?.topEmployees?.length ?? 0} />
+        <StatTile label="Employees Tracked" value={employees.length} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <div className="text-sm font-medium mb-2">Productivity by Employee</div>
-          <ProductivityBarChart data={barData} />
+          {barData.length > 0 ? (
+            <ProductivityBarChart data={barData} />
+          ) : (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              No productivity scores yet. Use Predict to generate scores.
+            </p>
+          )}
         </Card>
         <Card>
           <div className="text-sm font-medium mb-2">Hours vs Productivity</div>
-          <HoursVsProductivityScatter data={scatterData} />
+          {scatterData.length > 0 ? (
+            <HoursVsProductivityScatter data={scatterData} />
+          ) : (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              No productivity scores yet. Use Predict to generate scores.
+            </p>
+          )}
         </Card>
       </div>
     </div>

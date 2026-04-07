@@ -8,20 +8,21 @@ import axios from "axios";
 function mapEmployeeToPythonSchema(emp) {
   return {
     Department: emp.department || "General",
-    Gender: emp.gender || "Unknown", // add gender field in schema if needed
+    Gender: emp.gender || "Unknown",
     Age: emp.age ?? 0,
-    Years_At_Company: emp.experienceYears ?? 0,
-    Education_Level: emp.educationLevel || "Bachelors", // or default
+    Job_Title: emp.jobTitle || "",
+    Years_At_Company: emp.yearsAtCompany ?? 0,
+    Education_Level: emp.educationLevel || "Bachelors",
     Monthly_Salary: emp.monthlySalary ?? 0,
-    Work_Hours_Per_Week: emp.avgHoursPerDay ? emp.avgHoursPerDay * 5 : 0, // rough mapping
-    Projects_Handled: emp.tasksCompletedPerWeek ?? 0,
-    Overtime_Hours: emp.overtimeHoursPerWeek ?? 0,
-    Sick_Days: emp.absentDaysPerMonth ?? 0,
+    Work_Hours_Per_Week: emp.workHoursPerWeek ?? 0,
+    Projects_Handled: emp.projectsHandled ?? 0,
+    Overtime_Hours: emp.overtimeHours ?? 0,
+    Sick_Days: emp.sickDays ?? 0,
     Remote_Work_Frequency: emp.remoteWorkFrequency ?? 0,
-    Team_Size: emp.teamSize ?? 5,
+    Team_Size: emp.teamSize ?? 0,
     Training_Hours: emp.trainingHours ?? 0,
     Promotions: emp.promotions ?? 0,
-    Employee_Satisfaction_Score: emp.satisfactionScore ?? 0,
+    Employee_Satisfaction_Score: emp.employeeSatisfactionScore ?? 0,
     Resigned: emp.resigned ?? 0
   };
 }

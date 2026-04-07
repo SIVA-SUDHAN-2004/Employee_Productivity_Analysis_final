@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext(null);
@@ -18,6 +18,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Fire a global custom event so EmployeeContext can flush its state
+    // without creating a circular provider dependency.
+    window.dispatchEvent(new Event("ep-logout"));
     setUser(null);
     setToken(null);
     localStorage.removeItem("ep_user");

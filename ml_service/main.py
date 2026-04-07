@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+# Trigger hot reload
 from pydantic import BaseModel
 from typing import List
 from pathlib import Path
@@ -19,9 +20,9 @@ app.add_middleware(
 
 # ---------------------- LOAD MODEL PIPELINE ----------------------
 try:
-    with open("productivity_model.pkl", "rb") as f:
+    with open("employee_productivity_xgboost.pkl", "rb") as f:
         model_pipeline = pickle.load(f)
-    print("✅ Model pipeline loaded successfully!")
+    print("✅ XGBoost model pipeline loaded successfully!")
 except Exception as e:
     print("❌ Error loading model pipeline:", e)
     model_pipeline = None
@@ -31,6 +32,7 @@ class Employee(BaseModel):
     Department: str
     Gender: str
     Age: int
+    Job_Title: str
     Years_At_Company: int
     Education_Level: str
     Monthly_Salary: float
@@ -52,12 +54,18 @@ class EmployeeBatchRequest(BaseModel):
     employees: List[Employee]
 
 # ---------------------- HELPER FUNCTION ----------------------
+def safe_divide(a: float, b: float) -> float:
+    """Safe division that returns 0 when denominator is 0."""
+    return 0.0 if b == 0 else a / b
+
+
 def preprocess_employee(emp: Employee) -> dict:
-    """Convert Employee object to dict with engineered features."""
+    """Convert Employee object to dict with engineered features matching XGBoost training."""
     data = {
         "Department": emp.Department,
         "Gender": emp.Gender,
         "Age": emp.Age,
+        "Job_Title": emp.Job_Title,
         "Years_At_Company": emp.Years_At_Company,
         "Education_Level": emp.Education_Level,
         "Monthly_Salary": emp.Monthly_Salary,
@@ -71,10 +79,11 @@ def preprocess_employee(emp: Employee) -> dict:
         "Promotions": emp.Promotions,
         "Employee_Satisfaction_Score": emp.Employee_Satisfaction_Score,
         "Resigned": emp.Resigned,
-        # Feature engineered columns
-        "Overtime_Ratio": emp.Overtime_Hours / (emp.Work_Hours_Per_Week + 1),
-        "Project_Efficiency": emp.Projects_Handled / (emp.Years_At_Company + 1),
-        "Training_Effectiveness": emp.Training_Hours / (emp.Promotions + 1),
+        # Engineered features — must match employee_productivity_xgboost_model.py
+        "Experience_Salary_Interaction": emp.Years_At_Company * emp.Monthly_Salary,
+        "Workload_Intensity": safe_divide(emp.Work_Hours_Per_Week, emp.Projects_Handled),
+        "Overtime_Work_Ratio": safe_divide(emp.Overtime_Hours, emp.Work_Hours_Per_Week),
+        "SickDays_WorkDays_Ratio": safe_divide(emp.Sick_Days, emp.Work_Hours_Per_Week),
     }
     return data
 
@@ -100,6 +109,7 @@ def predict_productivity_batch(req: EmployeeBatchRequest):
 
     try:
         rows = [preprocess_employee(emp) for emp in req.employees]
+        
         df = pd.DataFrame(rows)
         preds = model_pipeline.predict(df)
         return {

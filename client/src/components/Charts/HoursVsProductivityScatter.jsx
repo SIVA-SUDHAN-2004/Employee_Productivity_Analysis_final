@@ -15,7 +15,7 @@ const HoursVsProductivityScatter = ({ data }) => (
       <CartesianGrid stroke="#1f2937" />
       <XAxis
         type="number"
-        dataKey="avgHoursPerDay"
+        dataKey="workHoursPerWeek"
         name="Hours/day"
         tick={{ fontSize: 10, fill: "#9ca3af" }}
       />

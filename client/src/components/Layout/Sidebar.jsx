@@ -16,7 +16,7 @@ const Sidebar = () => {
         <p className="text-xs text-slate-500 mt-1">{user?.organization}</p>
       </div>
       <nav className="space-y-1 flex-1">
-        <NavLink to="/" className={linkClass}>Dashboard</NavLink>
+        {/* <NavLink to="/" className={linkClass}>Dashboard</NavLink> */}
         <NavLink to="/upload" className={linkClass}>Upload CSV</NavLink>
         <NavLink to="/employees" className={linkClass}>Employees</NavLink>
         <NavLink to="/analytics" className={linkClass}>Analytics</NavLink>

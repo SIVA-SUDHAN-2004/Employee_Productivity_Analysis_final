@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/Layout/ProtectedRoute.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import UploadPage from "./pages/UploadPage.jsx";
@@ -17,7 +17,7 @@ const App = () => (
       path="/"
       element={
         <ProtectedRoute>
-          <DashboardPage />
+          <Navigate to="/analytics" replace />
         </ProtectedRoute>
       }
     />

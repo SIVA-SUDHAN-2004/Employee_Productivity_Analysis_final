@@ -16,11 +16,16 @@ const app = express();
 app.use(cors({
   origin: [
     "https://employee-productivity-analysis-fina.vercel.app",
-    "https://employee-productivity-analysis-final-17eeyllxq.vercel.app"
+    "https://employee-productivity-analysis-final-17eeyllxq.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174"
   ],
   credentials: true
 }));
-app.use(express.json());
+// Increase body-parser limits to handle large CSV uploads and batch predict payloads.
+// 20,000-row CSV serialised as JSON can easily exceed the default 100 kb limit.
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(morgan("dev"));
 
 app.get("/", (req, res) => {

@@ -9,8 +9,10 @@ import {
 
 // POST /api/employees/upload-csv
 export const uploadCSV = async (req, res) => {
+  console.log("uploadCSV: start");
   try {
     if (!req.file) {
+      console.log("uploadCSV: no file");
       return res.status(400).json({ message: "No file uploaded" });
     }
 
@@ -40,61 +42,69 @@ export const uploadCSV = async (req, res) => {
 
     const managerId = req.user._id;
 
+    // Extract top 1500 records safely. 100k insertion overloads free-tier clusters
+    // and causes the connection to time out or freeze the browser table.
+    // const maxRecords = records.slice(0, 1500);
+
     const employeesToInsert = records.map((row, index) => {
+      const rowClean = {};
+      for (const k in row) {
+        if (row.hasOwnProperty(k)) {
+          rowClean[k.toLowerCase().replace(/[\s_]/g, "")] = row[k];
+        }
+      }
+
       const employeeId =
-        row.employeeId ||
-        row.EmployeeId ||
-        row["employee_id"] ||
-        row["Employee_ID"] ||
-        row["Employee ID"] ||
-        row.id ||
-        `EMP_${Date.now()}_${index}`;
+        rowClean.employeeid ||
+        rowClean.id ||
+        `ROW_${index + 1}`;
 
       return {
         managerId,
         employeeId,
-        name: row.name || row.Name,
-        department: row.department || row.Department,
-        role: row.role || row.Role,
-        experienceYears: Number(
-          row.experienceYears ||
-            row.ExperienceYears ||
-            row["Experience Years"] ||
-            0
-        ),
-        age: Number(row.age || row.Age || 0),
-        avgHoursPerDay: Number(
-          row.avgHoursPerDay ||
-            row.AvgHoursPerDay ||
-            row["Avg Hours Per Day"] ||
-            0
-        ),
-        tasksCompletedPerWeek: Number(
-          row.tasksCompletedPerWeek ||
-            row.TasksCompletedPerWeek ||
-            row["Tasks Completed Per Week"] ||
-            0
-        ),
-        overtimeHoursPerWeek: Number(
-          row.overtimeHoursPerWeek ||
-            row.OvertimeHoursPerWeek ||
-            row["Overtime Hours Per Week"] ||
-            0
-        ),
-        absentDaysPerMonth: Number(
-          row.absentDaysPerMonth ||
-            row.AbsentDaysPerMonth ||
-            row["Absent Days Per Month"] ||
-            0
-        )
+        department: rowClean.department || rowClean.dept || "",
+        gender: rowClean.gender || "",
+        age: Number(rowClean.age || 0),
+        jobTitle: rowClean.jobtitle || rowClean.role || "",
+        hireDate: rowClean.hiredate || "",
+        yearsAtCompany: Number(rowClean.yearsatcompany || rowClean.experience || 0),
+        educationLevel: rowClean.educationlevel || "",
+        performanceScore: Number(rowClean.performancescore || rowClean.performance || 0),
+        monthlySalary: Number(rowClean.monthlysalary || rowClean.salary || 0),
+        workHoursPerWeek: Number(rowClean.workhoursperweek || rowClean.workhours || 0),
+        projectsHandled: Number(rowClean.projectshandled || rowClean.projects || 0),
+        overtimeHours: Number(rowClean.overtimehours || rowClean.overtime || 0),
+        sickDays: Number(rowClean.sickdays || rowClean.absences || 0),
+        remoteWorkFrequency: Number(rowClean.remoteworkfrequency || rowClean.remotework || 0),
+        teamSize: Number(rowClean.teamsize || 0),
+        trainingHours: Number(rowClean.traininghours || 0),
+        promotions: Number(rowClean.promotions || 0),
+        employeeSatisfactionScore: Number(rowClean.employeesatisfactionscore || rowClean.satisfaction || 0),
+        resigned: 
+          String(rowClean.resigned).toLowerCase() === "true" || String(rowClean.resigned) === "1"
+            ? 1 
+            : 0
       };
     });
 
-    const inserted = await Employee.insertMany(employeesToInsert);
+    // ── Full replace: wipe the manager's existing dataset, then insert fresh ──
+    // This prevents stale records from previous uploads accumulating in MongoDB.
+    // Every upload is treated as the authoritative, current dataset.
+    await Employee.deleteMany({ managerId });
+    const inserted = await Employee.insertMany(
+      employeesToInsert.map((emp) => ({ ...emp, productivityScore: null })),
+      { ordered: false }
+    );
+
+    // Fetch only the most recent subset to prevent huge JSON strings crashing Node
+    const allRecords = await Employee.find({ managerId })
+      .sort({ createdAt: 1 })
+      // .limit(1500)
+      // .lean();
 
     return res.status(201).json({
       insertedCount: inserted.length,
-      sample: inserted.slice(0, 5)
+      employees: allRecords
     });
   } catch (err) {
     console.error(err);
@@ -116,7 +126,7 @@ export const getEmployees = async (req, res) => {
   const managerId = req.user._id;
 
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 50;
+  const limit = Number(req.query.limit) || 10000;
   const skip = (page - 1) * limit;
 
   const [employees, total] = await Promise.all([
@@ -170,6 +180,20 @@ export const deleteEmployee = async (req, res) => {
   res.json({ message: "Deleted" });
 };
 
+// DELETE /api/employees  — wipe all records for the authenticated manager
+export const deleteAllEmployees = async (req, res) => {
+  try {
+    const result = await Employee.deleteMany({ managerId: req.user._id });
+    return res.json({
+      message: "All employee data cleared",
+      deletedCount: result.deletedCount
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to clear employee data", details: err.message });
+  }
+};
+
 // POST /api/employees/:id/predict
 export const predictForEmployee = async (req, res) => {
   const { id } = req.params;
@@ -190,28 +214,33 @@ export const predictForEmployee = async (req, res) => {
 
 // POST /api/employees/predict
 export const predictForMany = async (req, res) => {
-  const { employeeIds } = req.body;
+  try {
+    const { employeeIds } = req.body;
 
-  let query = { managerId: req.user._id };
-  if (Array.isArray(employeeIds) && employeeIds.length) {
-    query._id = { $in: employeeIds };
+    let query = { managerId: req.user._id };
+    if (Array.isArray(employeeIds) && employeeIds.length) {
+      query._id = { $in: employeeIds };
+    }
+
+    const employees = await Employee.find(query);
+
+    if (employees.length === 0) {
+      return res.json([]);
+    }
+
+    const scores = await predictProductivityBatchRemote(employees);
+
+    const updated = await Promise.all(
+      employees.map(async (emp, idx) => {
+        emp.productivityScore = scores[idx];
+        await emp.save();
+        return emp;
+      })
+    );
+
+    res.json(updated);
+  } catch (err) {
+    console.error("ML Prediction Error:", err.message);
+    res.status(500).json({ message: "Failed to predict productivity", details: err.message });
   }
-
-  const employees = await Employee.find(query);
-
-  if (employees.length === 0) {
-    return res.json([]);
-  }
-
-  const scores = await predictProductivityBatchRemote(employees);
-
-  const updated = await Promise.all(
-    employees.map(async (emp, idx) => {
-      emp.productivityScore = scores[idx];
-      await emp.save();
-      return emp;
-    })
-  );
-
-  res.json(updated);
 };
